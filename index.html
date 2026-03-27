@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puter.js AI Chatbot</title>
+    <script src="https://js.puter.com/v2/"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+        }
+        .user {
+            background: #007bff;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .assistant {
+            background: #e5e5ea;
+            color: black;
+            align-self: flex-start;
+        }
+        #input-area {
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #ddd;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        #chat-form {
+            display: flex;
+            gap: 10px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 25px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .typing {
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container"></div>
+
+    <div id="input-area">
+        <form id="chat-form">
+            <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" required>
+            <button type="submit">Send</button>
+        </form>
+    </div>
+
+    <script>
+        // Chat history for multi-turn conversation
+        let messages = [
+            {
+                role: "system",
+                content: "You are a helpful, friendly assistant."
+            }
+        ];
+
+        const chatContainer = document.getElementById('chat-container');
+        const form = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+
+        // Add a message to the UI
+        function addMessage(role, content, isTyping = false) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            if (isTyping) div.classList.add('typing');
+            div.textContent = content;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return div;
+        }
+
+        // Main chat handler
+        async function sendMessage() {
+            const userText = userInput.value.trim();
+            if (!userText) return;
+
+            // Add user message to UI and history
+            addMessage('user', userText);
+            messages.push({ role: "user", content: userText });
+
+            userInput.value = '';
+            const loadingMsg = addMessage('assistant', 'Thinking...', true);
+
+            try {
+                // Call Puter AI with full conversation history
+                const response = await puter.ai.chat(messages, {
+                    model: 'gpt-5-nano',   // Change to 'claude-sonnet-4', 'gemini-2.5-flash-lite', etc.
+                    stream: true           // Real-time typing effect
+                });
+
+                // Remove the "Thinking..." placeholder
+                loadingMsg.remove();
+
+                // Create a new assistant message div for streaming
+                const assistantDiv = document.createElement('div');
+                assistantDiv.className = 'message assistant';
+                chatContainer.appendChild(assistantDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                let fullResponse = '';
+
+                // Stream the response chunk by chunk
+                for await (const part of response) {
+                    if (part?.text) {
+                        fullResponse += part.text;
+                        assistantDiv.textContent = fullResponse;
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                }
+
+                // Add the final response to history for context in next turns
+                messages.push({ role: "assistant", content: fullResponse });
+
+            } catch (error) {
+                loadingMsg.textContent = 'Sorry, something went wrong. Please try again.';
+                console.error(error);
+            }
+        }
+
+        // Form submit handler
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            sendMessage();
+        });
+
+        // Optional: Auto-focus input
+        window.addEventListener('load', () => {
+            userInput.focus();
+            // Optional welcome message
+            addMessage('assistant', 'Hello! I\'m an AI chatbot powered by Puter.js. How can I help you today?');
+        });
+    </script>
+</body>
+</html>
